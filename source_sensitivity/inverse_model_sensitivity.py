@@ -1,3 +1,4 @@
+import sys
 from types import MappingProxyType
 from source.inverse_model import InverseModel
 import source.flow_network as flow_network
