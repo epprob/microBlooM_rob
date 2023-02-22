@@ -6,9 +6,9 @@
 # import testcases.testcase_bc_tuning
 
 # Run test case to tune diameters or transmissibilitites with the adjoint method
-# import testcases.measurement_placement.hexagonal.testcase_measurement_placement_hexa_max_max_s
+# import testcases.measurement_placement.hexagonal.testcase_measurement_placement_hexa
 
-import testcases.mvn_1.a_network_preprocessing_cut
+import testcases.mvn_1.mvn_1_only_sensitivity_approach
 
 # Run test case with only the blood flow model
 # import testcases.testcase_blood_flow_model

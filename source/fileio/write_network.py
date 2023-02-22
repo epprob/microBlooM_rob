@@ -76,10 +76,16 @@ class WriteNetworkIgraph(WriteNetwork):
         if flownetwork.ht is not None:
             graph.es["ht"] = flownetwork.ht
 
+        if flownetwork.wildcard_edge_attr is not None:
+            graph.es["wildcard_edge_attr"] = flownetwork.wildcard_edge_attr
+
         graph.vs["xyz"] = flownetwork.xyz.tolist()
 
         if flownetwork.pressure is not None:
             graph.vs["pressure"] = flownetwork.pressure
+
+        if flownetwork.wildcard_vertex_attr is not None:
+            graph.vs["wildcard_vertex_attr"] = flownetwork.wildcard_vertex_attr
 
         graph.write_pickle(self._PARAMETERS["write_path_igraph"])
         # todo: check that old graph is not overwritten
@@ -225,10 +231,16 @@ class WriteNetworkVtp(WriteNetwork):
         if flownetwork.ht is not None:
             graph.es["ht"] = flownetwork.ht
 
+        if flownetwork.wildcard_edge_attr is not None:
+            graph.es["wildcard_edge_attr"] = flownetwork.wildcard_edge_attr
+
         graph.vs["xyz"] = flownetwork.xyz.tolist()
 
         if flownetwork.pressure is not None:
             graph.vs["pressure"] = flownetwork.pressure
+
+        if flownetwork.wildcard_vertex_attr is not None:
+            graph.vs["wildcard_vertex_attr"] = flownetwork.wildcard_vertex_attr
 
         # Make a copy of the graph so that modifications are possible, without
         # changing the original. Add indices that can be used for comparison with

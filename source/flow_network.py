@@ -24,6 +24,7 @@ class FlowNetwork(object):
         # Vertex attributes
         self.xyz = None
         self.pressure = None
+        self.wildcard_vertex_attr = None
 
         # Edge attributes
         self.edge_list = None
@@ -35,6 +36,7 @@ class FlowNetwork(object):
         self.hd = None
         self.flow_rate = None
         self.rbc_velocity = None
+        self.wildcard_edge_attr = None
 
         # Network boundaries
         self.boundary_vs = None # vertex ids of boundaries (1d np.array)
