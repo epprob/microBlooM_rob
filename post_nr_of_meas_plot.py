@@ -7,29 +7,29 @@ import matplotlib.pyplot as plt
 
 
 
-with open('output/realistic_box_200_std_100_v2/norm_flowrate_to_truth_sens.json', 'r') as f:
+with open('output/hexa_distortion_std_2_sensitivity_neuman/norm_flowrate_to_truth_sens.json', 'r') as f:
     norm_flowrate_to_truth_sens = json.load(f)
 
-with open('output/realistic_box_200_std_100_v2/norm_flowrate_to_truth_rand.json', 'r') as f:
-    norm_flowrate_to_truth_rand = json.load(f)
+with open('output/hexa_distortion_std_2_sensitivity_neuman/norm_flowrate_to_truth_neum.json', 'r') as f:
+    norm_flowrate_to_truth_neum = json.load(f)
 
-with open('output/realistic_box_200_std_100_v2/norm_boundary_to_truth_sens.json', 'r') as f:
+with open('output/hexa_distortion_std_2_sensitivity_neuman/norm_boundary_to_truth_sens.json', 'r') as f:
     norm_boundary_to_truth_sens = json.load(f)
 
-with open('output/realistic_box_200_std_100_v2/norm_boundary_to_truth_rand.json', 'r') as f:
-    norm_boundary_to_truth_rand = json.load(f)
+with open('output/hexa_distortion_std_2_sensitivity_neuman/norm_boundary_to_truth_neum.json', 'r') as f:
+    norm_boundary_to_truth_neum = json.load(f)
 
-nr_of_samples = np.size(norm_flowrate_to_truth_sens['11'])
+nr_of_samples = np.size(norm_flowrate_to_truth_sens['1'])
 
 flowrate_norm_sens = np.hstack([norm_flowrate_to_truth_sens[i] for i in norm_flowrate_to_truth_sens])
 boundary_norm_sens = np.hstack([norm_boundary_to_truth_sens[i] for i in norm_boundary_to_truth_sens])
 nr_of_meas_sens = np.hstack([[i]*np.size(norm_flowrate_to_truth_sens[i]) for i in norm_flowrate_to_truth_sens])
 strategy_sens = np.array(['sensitivity']*np.size(nr_of_meas_sens))
 
-flowrate_norm_rand = np.hstack([norm_flowrate_to_truth_rand[i] for i in norm_flowrate_to_truth_rand])
-boundary_norm_rand = np.hstack([norm_boundary_to_truth_rand[i] for i in norm_boundary_to_truth_rand])
-nr_of_meas_rand = np.hstack([[i]*np.size(norm_flowrate_to_truth_rand[i]) for i in norm_flowrate_to_truth_rand])
-strategy_rand = np.array(['random']*np.size(nr_of_meas_rand))
+flowrate_norm_rand = np.hstack([norm_flowrate_to_truth_neum[i] for i in norm_flowrate_to_truth_neum])
+boundary_norm_rand = np.hstack([norm_boundary_to_truth_neum[i] for i in norm_boundary_to_truth_neum])
+nr_of_meas_rand = np.hstack([[i] * np.size(norm_flowrate_to_truth_neum[i]) for i in norm_flowrate_to_truth_neum])
+strategy_rand = np.array(['remove']*np.size(nr_of_meas_rand))
 
 fig, ax = plt.subplots(1, 2, figsize=(10,5))
 
@@ -48,4 +48,4 @@ fig.suptitle('Testcase with hexagonal network, nr of samples = '+str(nr_of_sampl
 ax[0].set_title('L2 norm flow rates to ground truth')
 ax[1].set_title('L2 norm boundary pressures to ground truth')
 
-fig.savefig("output/realistic_box_200_std_100_v2/comparison_to_groundtruth_distortion.png", dpi=200)
+fig.savefig("output/hexa_distortion_std_2_sensitivity_neuman/comparison_to_groundtruth_distortion.png", dpi=200)

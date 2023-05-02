@@ -158,6 +158,7 @@ g_subgraph_largest = g_subgraph_decompose[np.argmax(n_vs_decomposed)]  # Decompo
 print("Largest subgraph:")
 print(g_subgraph_largest.summary())
 
+# Reference network
 flow_network_small_ref = FlowNetwork(imp_readnetwork, imp_writenetwork, imp_ht, imp_hd, imp_transmiss, imp_buildsystem,
                                      imp_solver, imp_velocity, PARAMETERS)
 
@@ -181,7 +182,7 @@ boundary_vs_id = np.arange(g_subgraph_largest.vcount())[is_boundary]
 boundary_value = flow_network_small_ref.pressure[is_boundary]
 boundary_type = np.ones(np.size(boundary_vs_id))
 
-PARAMETERS["write_path_igraph"] = "output/realistic_box_200_onlySens_init_0_29p/small_ref.vtp"
+PARAMETERS["write_path_igraph"] = "output/realistic_box_200_sensitivity_edgeremove/small_ref.vtp"
 flow_network_small_ref.write_network()
 
 print("Nr of es: ", g_subgraph_largest.ecount())
@@ -201,21 +202,55 @@ print("Update flow, pressure and velocity: ...")
 flow_network_small_ref.update_blood_flow()
 print("Update flow, pressure and velocity: DONE")
 
+# Network for sensitivity calculation
+flow_network_small_sensitivity = FlowNetwork(imp_readnetwork, imp_writenetwork, imp_ht, imp_hd, imp_transmiss, imp_buildsystem,
+                                     imp_solver, imp_velocity, PARAMETERS)
+
+flow_network_small_sensitivity.nr_of_vs = g_subgraph_largest.vcount()
+flow_network_small_sensitivity.nr_of_es = g_subgraph_largest.ecount()
+
+# Edge attributes
+flow_network_small_sensitivity.length = np.array(g_subgraph_largest.es["length"])
+flow_network_small_sensitivity.diameter = np.array(g_subgraph_largest.es["diameter"])
+flow_network_small_sensitivity.flow_rate = g_subgraph_largest.es["flow_rate"]
+flow_network_small_sensitivity.rbc_velocity = g_subgraph_largest.es["rbc_velocity"]
+flow_network_small_sensitivity.edge_list = np.array(g_subgraph_largest.get_edgelist())
+
+# Vertex attributes
+flow_network_small_sensitivity.xyz = np.array(g_subgraph_largest.vs["xyz"])
+flow_network_small_sensitivity.pressure = np.array(g_subgraph_largest.vs["pressure"])
+
+flow_network_small_sensitivity.boundary_vs = boundary_vs_id
+flow_network_small_sensitivity.boundary_val = boundary_value
+flow_network_small_sensitivity.boundary_type = boundary_type
+
+print("Update transmissibility: ...")
+flow_network_small_sensitivity.update_transmissibility()
+print("Update transmissibility: DONE")
+
+# Update flow rate, pressure and RBC velocity
+print("Update flow, pressure and velocity: ...")
+flow_network_small_sensitivity.update_blood_flow()
+print("Update flow, pressure and velocity: DONE")
+
+# Start with finding sensitivity order
+global_eids = np.arange(flow_network_small_ref.nr_of_es)
+sensitivity_order = np.array([], dtype=int)
+
 # Initialise objects related to the inverse model.
 imp_readtargetvalues, imp_readparameters, imp_adjoint_parameter, imp_adjoint_solver, imp_alpha_mapping = setup_simulation.setup_inverse_model(PARAMETERS)
 
-inverse_model_sensitivity = InverseModelSensitivity(flow_network_small_ref, imp_readtargetvalues, imp_readparameters,
-                                                    imp_adjoint_parameter, imp_adjoint_solver, imp_alpha_mapping, PARAMETERS)
+inverse_model_sensitivity_base = InverseModelSensitivity(flow_network_small_ref, imp_readtargetvalues, imp_readparameters,
+                                                         imp_adjoint_parameter, imp_adjoint_solver, imp_alpha_mapping, PARAMETERS)
 
-inverse_model_sensitivity.initialise_inverse_model()
-
-inverse_model_sensitivity.update_sensitivity()
+inverse_model_sensitivity_base.initialise_inverse_model()
+inverse_model_sensitivity_base.update_sensitivity()
 
 boundary = np.zeros(flow_network_small_ref.nr_of_vs)
 boundary[is_boundary] = 1
 
 flow_network_small_ref.wildcard_vertex_attr = boundary
-flow_network_small_ref.wildcard_edge_attr = inverse_model_sensitivity.param_sensitivity
+flow_network_small_ref.wildcard_edge_attr = inverse_model_sensitivity_base.param_sensitivity
 
 flow_network_small_ref.write_network()
 
@@ -228,11 +263,49 @@ norm_flowrate_to_truth_rand = {}
 norm_boundary_to_truth_sens = {}
 norm_boundary_to_truth_rand = {}
 
-# nr_of_realisations = 51
+inverse_model_sensitivity_neum = InverseModelSensitivity(flow_network_small_sensitivity, imp_readtargetvalues, imp_readparameters,
+                                                         imp_adjoint_parameter, imp_adjoint_solver, imp_alpha_mapping, PARAMETERS)
+
+inverse_model_sensitivity_neum.initialise_inverse_model()
+inverse_model_sensitivity_neum.update_sensitivity()
+
+edge_id_remove_local = -1
+
+for i in range(52):
+    if np.size(sensitivity_order) > 0 and edge_id_remove_local >=0:
+
+        current_remove = edge_id_remove_local
+
+        flow_network_small_sensitivity.edge_list = np.delete(flow_network_small_sensitivity.edge_list, current_remove, axis=0)
+        flow_network_small_sensitivity.diameter = np.delete(flow_network_small_sensitivity.diameter, current_remove)
+        flow_network_small_sensitivity.length = np.delete(flow_network_small_sensitivity.length, current_remove)
+        flow_network_small_sensitivity.ht = np.delete(flow_network_small_sensitivity.ht, current_remove)
+        flow_network_small_sensitivity.hd = np.delete(flow_network_small_sensitivity.hd, current_remove)
+        flow_network_small_sensitivity.mu_rel = np.delete(flow_network_small_sensitivity.mu_rel, current_remove)
+        flow_network_small_sensitivity.transmiss = np.delete(flow_network_small_sensitivity.transmiss, current_remove)
+        flow_network_small_sensitivity.flow_rate = np.delete(flow_network_small_sensitivity.flow_rate, current_remove)
+        flow_network_small_sensitivity.rbc_velocity = np.delete(flow_network_small_sensitivity.rbc_velocity, current_remove)
+        flow_network_small_sensitivity.nr_of_es = flow_network_small_sensitivity.nr_of_es - 1
+        global_eids = np.delete(global_eids, current_remove)
+
+        flow_network_small_sensitivity.update_linear_system()
+
+        inverse_model_sensitivity_neum = InverseModelSensitivity(flow_network_small_sensitivity, imp_readtargetvalues,
+                                                            imp_readparameters, imp_adjoint_parameter,
+                                                            imp_adjoint_solver, imp_alpha_mapping, PARAMETERS)
+
+        inverse_model_sensitivity_neum.initialise_inverse_model()
+        inverse_model_sensitivity_neum.update_sensitivity()
+
+    edge_id_remove_local = np.argmax(inverse_model_sensitivity_neum.param_sensitivity)
+    edge_id_remove_global = global_eids[edge_id_remove_local]
+    sensitivity_order = np.append(sensitivity_order, edge_id_remove_global)
 
 nr_of_realisations = 1
 
-for nr_of_meas in range(1, 60):
+# nr_of_realisations = 1
+
+for nr_of_meas in range(1, 29):
 #for nr_of_meas in range(1, 9):
 
     flow_rates_opt_sensitivity = np.zeros((flow_network_small_ref.nr_of_es, nr_of_realisations))
@@ -240,6 +313,7 @@ for nr_of_meas in range(1, 60):
     boundary_pressure_opt_sensitivity = np.zeros((np.size(boundary_pressure_ground_truth), nr_of_realisations))
 
     eid_meas_sens_approach = np.array([])
+    eid_meas_neum_approach = np.array([])
 
     for realisation in range(nr_of_realisations):
         print("#################################")
@@ -280,7 +354,7 @@ for nr_of_meas in range(1, 60):
         inverse_model_sens_approach = InverseModel(flow_network_sens_approach, imp_readtargetvalues, imp_readparameters, imp_adjoint_parameter,
                                                    imp_adjoint_solver, imp_alpha_mapping, PARAMETERS)
 
-        nr_of_boundaries = inverse_model_sensitivity.nr_of_parameters
+        nr_of_boundaries = inverse_model_sensitivity_base.nr_of_parameters
 
         distortion = np.random.normal(size=nr_of_boundaries, scale=100)  # scale is std of distortion
 
@@ -293,14 +367,15 @@ for nr_of_meas in range(1, 60):
 
         inverse_model_sens_approach.initialise_inverse_model()
 
-        eid_meas_sens_approach = np.argpartition(inverse_model_sensitivity.param_sensitivity, -nr_of_meas)[-nr_of_meas:]
+        #eid_meas_sens_approach = np.argpartition(inverse_model_sensitivity_base.param_sensitivity, -nr_of_meas)[-nr_of_meas:]
+        eid_meas_neum_approach = sensitivity_order[:nr_of_meas]
 
-        eid_max_sensitivity = np.argmax(inverse_model_sensitivity.param_sensitivity)
+        eid_max_sensitivity = np.argmax(inverse_model_sensitivity_base.param_sensitivity)
 
-        inverse_model_sens_approach.edge_constraint_eid = np.array([eid_meas_sens_approach]).reshape(-1)
+        inverse_model_sens_approach.edge_constraint_eid = np.array([eid_meas_neum_approach]).reshape(-1)
         inverse_model_sens_approach.nr_of_edge_constraints = np.size(inverse_model_sens_approach.edge_constraint_eid)
         inverse_model_sens_approach.edge_constraint_type = np.ones(inverse_model_sens_approach.nr_of_edge_constraints)
-        inverse_model_sens_approach.edge_constraint_value = np.array([flowrate_ground_truth[eid_meas_sens_approach]]).reshape(-1)
+        inverse_model_sens_approach.edge_constraint_value = np.array([flowrate_ground_truth[eid_meas_neum_approach]]).reshape(-1)
         inverse_model_sens_approach.edge_constraint_range_pm = np.zeros(inverse_model_sens_approach.nr_of_edge_constraints)
         inverse_model_sens_approach.edge_constraint_sigma = np.ones(inverse_model_sens_approach.nr_of_edge_constraints) * np.abs(flowrate_ground_truth[eid_max_sensitivity])
 
@@ -320,11 +395,11 @@ for nr_of_meas in range(1, 60):
         print(str(j-1) + " iterations done (f_H =", "%.2e" % inverse_model_sens_approach.f_h + ")")
         print("Solve the inverse problem and update the boundaries (Sensitivity approach): DONE")
 
-        PARAMETERS["write_path_igraph"] = "output/realistic_box_200_onlySens_init_0_29p/small_opt_meas_"+str(nr_of_meas)+"_real_"+str(realisation)+".vtp"
+        PARAMETERS["write_path_igraph"] = "output/realistic_box_200_sensitivity_edgeremove/small_opt_meas_"+str(nr_of_meas)+"_real_"+str(realisation)+".vtp"
 
         nr_of_flowrates_vtp = np.size(flowrate_ground_truth)
         is_target_vtp = np.zeros(nr_of_flowrates_vtp)
-        is_target_vtp[eid_meas_sens_approach] = 1
+        is_target_vtp[eid_meas_neum_approach] = 1
 
         flow_network_sens_approach.wildcard_edge_attr = np.copy(is_target_vtp)
         flow_network_sens_approach.wildcard_vertex_attr = np.copy(boundary)
@@ -351,45 +426,45 @@ for nr_of_meas in range(1, 60):
     nr_of_flowrates = np.size(flowrate_ground_truth)
 
     is_target = np.zeros(nr_of_flowrates)
-    is_target[eid_meas_sens_approach] = 1
+    is_target[eid_meas_neum_approach] = 1
 
-    size = (is_target*4 + 1.) * 6
+    # size = (is_target*4 + 1.) * 6
+    #
+    # is_dir_right = np.sign(flowrate_ground_truth) * np.sign(flow_rates_opt_sensitivity.reshape(-1))
+    # is_dir_right[is_dir_right<0] = 0
+    #
+    # color = np.copy(is_dir_right)
+    # is_dir_right[eid_meas_neum_approach] = 2
+    #
+    # rel_error = np.abs((flowrate_ground_truth - flow_rates_opt_sensitivity.reshape(-1)) / flowrate_ground_truth)
+    # rel_error_median = np.median(rel_error)
+    #
+    # # fig1, [ax1, ax2] = plt.subplots(1, 2, figsize=(8,4))
+    # fig1, ax1 = plt.subplots(1, 1, figsize=(5, 5))
+    # ax1.scatter(np.abs(flowrate_ground_truth), np.abs(flow_rates_opt_sensitivity), s=size, c = is_dir_right, cmap = "rainbow", zorder=2)
+    # min_flow_val = 1.e-20  # np.min(np.append(np.abs(flowrate_ground_truth), np.abs(flow_rates_opt_sensitivity)))
+    # max_flow_val = 2.e-13  # np.max(np.append(np.abs(flowrate_ground_truth), np.abs(flow_rates_opt_sensitivity)))
+    # ax1.plot([min_flow_val, max_flow_val], [min_flow_val, max_flow_val], 'k-', zorder=1)
+    # ax1.set_xscale("log")
+    # ax1.set_yscale("log")
+    # ax1.set_title('Nr. of meas = '+str(nr_of_meas)+', L2 = '+ '%.2E' % current_norm+', median error = '+'%.2E' % rel_error_median, size =8)
+    #
+    # ax1.set_xlabel('Flow rates ground truth')
+    # ax1.set_ylabel('Flow rates optimised')
+    #
+    # ax1.set_xlim([min_flow_val, max_flow_val])
+    # ax1.set_ylim([min_flow_val, max_flow_val])
+    #
+    # # rel_difference = (flow_rates_opt_sensitivity.reshape(-1) - flowrate_ground_truth) / flowrate_ground_truth
+    #
+    # # ax2.scatter(np.abs(flowrate_ground_truth), rel_difference)
+    #
+    # plt.tight_layout()
+    #
+    # fig1.savefig("output/realistic_box_200_sensitivity_edgeremove/flowrate_scatter_nr_meas_"+str(nr_of_meas)+".png", dpi=200)
 
-    is_dir_right = np.sign(flowrate_ground_truth) * np.sign(flow_rates_opt_sensitivity.reshape(-1))
-    is_dir_right[is_dir_right<0] = 0
-
-    color = np.copy(is_dir_right)
-    is_dir_right[eid_meas_sens_approach] = 2
-
-    rel_error = np.abs((flowrate_ground_truth - flow_rates_opt_sensitivity.reshape(-1)) / flowrate_ground_truth)
-    rel_error_median = np.median(rel_error)
-
-    # fig1, [ax1, ax2] = plt.subplots(1, 2, figsize=(8,4))
-    fig1, ax1 = plt.subplots(1, 1, figsize=(5, 5))
-    ax1.scatter(np.abs(flowrate_ground_truth), np.abs(flow_rates_opt_sensitivity), s=size, c = is_dir_right, cmap = "rainbow", zorder=2)
-    min_flow_val = 1.e-20  # np.min(np.append(np.abs(flowrate_ground_truth), np.abs(flow_rates_opt_sensitivity)))
-    max_flow_val = 2.e-13  # np.max(np.append(np.abs(flowrate_ground_truth), np.abs(flow_rates_opt_sensitivity)))
-    ax1.plot([min_flow_val, max_flow_val], [min_flow_val, max_flow_val], 'k-', zorder=1)
-    ax1.set_xscale("log")
-    ax1.set_yscale("log")
-    ax1.set_title('Nr. of meas = '+str(nr_of_meas)+', L2 = '+ '%.2E' % current_norm+', median error = '+'%.2E' % rel_error_median, size =8)
-
-    ax1.set_xlabel('Flow rates ground truth')
-    ax1.set_ylabel('Flow rates optimised')
-
-    ax1.set_xlim([min_flow_val, max_flow_val])
-    ax1.set_ylim([min_flow_val, max_flow_val])
-
-    # rel_difference = (flow_rates_opt_sensitivity.reshape(-1) - flowrate_ground_truth) / flowrate_ground_truth
-
-    # ax2.scatter(np.abs(flowrate_ground_truth), rel_difference)
-
-    plt.tight_layout()
-
-    fig1.savefig("output/realistic_box_200_onlySens_init_0_29p/flowrate_scatter_nr_meas_"+str(nr_of_meas)+".png", dpi=200)
-
-    with open('output/realistic_box_200_onlySens_init_0_29p/norm_flowrate_to_truth_sens.json', 'w') as fp:
+    with open('output/realistic_box_200_sensitivity_edgeremove/norm_flowrate_to_truth_sens_remove.json', 'w') as fp:
         json.dump(norm_flowrate_to_truth_sens, fp)
 
-    with open('output/realistic_box_200_onlySens_init_0_29p/norm_boundary_to_truth_sens.json', 'w') as fp:
+    with open('output/realistic_box_200_sensitivity_edgeremove/norm_boundary_to_truth_sens_remove.json', 'w') as fp:
         json.dump(norm_boundary_to_truth_sens, fp)

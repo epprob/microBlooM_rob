@@ -89,4 +89,10 @@ class FlowNetwork(object):
         self._imp_solver.update_pressure_flow(self)
         self._imp_rbcvelocity.update_velocity(self)
 
+    def update_linear_system(self):
+        """
+        Solve a linear system for updating pressures, flow rates and red blood cell velocities.
+        """
+        self._imp_buildsystem.build_linear_system(self)
+
 
