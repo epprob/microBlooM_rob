@@ -14,12 +14,15 @@ from scipy.sparse.linalg import norm
 
 
 class InverseModelSensitivity(InverseModel):
+    # Oli: Diese InverseModelSensitivity Klasse erbt von der InverseModel Klasse. Ist sicher nicht sauber gelöst
+    # aber hat so eigentlich recht gut funktioniert...
 
     def __init__(self, flownetwork: flow_network.FlowNetwork, imp_readtargetvalues: read_target_values.ReadTargetValues,
                  imp_readparameters: read_parameters.ReadParameters,
                  imp_adjointmethodparameters: adj_method_parameters.AdjointMethodImplementations,
                  imp_adjointmethodsolver: adj_method_solver.AdjointMethodSolver,
                  imp_alphamapping: alpha_mapping.AlphaRestriction, PARAMETERS: MappingProxyType):
+
         super().__init__(flownetwork, imp_readtargetvalues, imp_readparameters, imp_adjointmethodparameters,
                          imp_adjointmethodsolver, imp_alphamapping, PARAMETERS)
 
@@ -38,14 +41,19 @@ class InverseModelSensitivity(InverseModel):
         pass
 
     def update_sensitivity(self):
-
+        # Update 2d array with all partial derivatives d_flowrate_i/d_parameter_j
         adjoint_sensitivity_implementations.update_d_flowrateall_d_alpha(self, self._flow_network)
+        # Update 2d array with all partial derivatives d_flowrate_i/d_pressures_k
         adjoint_sensitivity_implementations.update_d_flowrateall_d_pressure(self, self._flow_network)
+        # Update 2d array with all partial derivatives d_g_i/d_alpha_j (g is residual of linear system)
         self._imp_adjointmethodparameters._update_d_g_d_alpha(self, self._flow_network)
 
+        # Solve adjoint equation
         lambda_matrix = spsolve(csc_matrix(self._flow_network.system_matrix.transpose()),
                                 -csc_matrix(self.d_flowrates_d_pressure.transpose()))
 
+        # Update sensitivity matrix
         self.sensitivity_matrix = lambda_matrix.transpose().dot(csc_matrix(self.d_g_d_alpha)) + self.d_flowrates_d_alpha
 
+        # Update L2 norm of sensitivity matrix
         self.param_sensitivity = norm(self.sensitivity_matrix, axis=1)

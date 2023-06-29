@@ -18,7 +18,12 @@ def update_d_flowrateall_d_pressure(inversemodel, flownetwork):
 
     row = np.append(edge_indices, edge_indices)
     col = np.append(edge_list[:, 0], edge_list[:, 1])
-    data = np.append(transmissibilities, -transmissibilities)
+    data = np.append(transmissibilities, -transmissibilities)  # for flow rate sensitivity
+
+    # for velocity based sensitivity (hack
+    # diameters = flownetwork.diameter
+    # data = np.append(transmissibilities * 4. / (np.square(diameters) * np.pi),
+    #                  -transmissibilities * 4. / (np.square(diameters) * np.pi))
 
     inversemodel.d_flowrates_d_pressure = coo_matrix((data, (row, col)),
                                                      shape=(flownetwork.nr_of_es, flownetwork.nr_of_vs))

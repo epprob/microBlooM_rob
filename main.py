@@ -10,7 +10,11 @@
 
 # import testcases.mvn_1.mvn_1_only_sensitivity_manual_pick
 
-import testcases.mvn_1.mvn_1_sensitivity_edgedelete_approach
+import testcases.measurement_placement.hexagonal.testcase_oli_L2norm_apriori
+
+# import testcases.mvn_1.mvn_1_sensitivity_edgedelete_approach
+
+# import testcases.networks_sensitivity_fs.nw_fs_sensitivity
 
 # Run test case with only the blood flow model
 # import testcases.testcase_blood_flow_model
